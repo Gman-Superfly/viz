@@ -1,0 +1,1438 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Embedding Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes gradient {
+            0% { background-position: 0% 50% }
+            50% { background-position: 100% 50% }
+            100% { background-position: 0% 50% }
+        }
+        
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #04243a; /* Deep blue like in the image */
+        }
+        
+        #canvas { width: 100vw; height: 100vh; }
+        
+        .neo-glass { 
+            background: rgba(255, 255, 255, 0.1); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 20px rgba(78, 201, 224, 0.3), 
+                        inset 0 0 20px rgba(78, 201, 224, 0.1);
+        }
+        
+        .btn-neon {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-neon::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            z-index: -1;
+            background: linear-gradient(45deg, #4ec9e0, #78e6c0, #e0726c, #efd67c);
+            background-size: 400% 400%;
+            animation: gradient 5s ease infinite;
+            border-radius: 14px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .btn-neon:hover::before {
+            opacity: 1;
+        }
+        
+        .digital-text {
+            text-shadow: 0 0 5px #4ec9e0, 0 0 10px #4ec9e0;
+            letter-spacing: 1px;
+        }
+        
+        .retro-grid {
+            background-image: linear-gradient(rgba(78, 201, 224, 0.1) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(78, 201, 224, 0.1) 1px, transparent 1px);
+            background-size: 25px 25px;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #4ec9e0;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="font-sans text-white antialiased">
+    <!-- Loading Overlay -->
+    <div id="loading" class="fixed inset-0 flex items-center justify-center bg-black/80 z-50 transition-all duration-700">
+        <div class="flex flex-col items-center gap-6">
+            <div class="relative">
+                <div class="w-16 h-16 border-4 border-transparent border-t-[#4ec9e0] border-r-[#78e6c0] rounded-full animate-spin"></div>
+                <div class="absolute inset-0 w-16 h-16 border-4 border-[#4ec9e0]/30 rounded-full"></div>
+            </div>
+            <p class="text-xl font-mono tracking-widest digital-text">INITIALIZING MATRIX</p>
+            <div id="loading-progress" class="text-sm font-mono w-64 text-center"></div>
+        </div>
+    </div>
+
+    <!-- Main Canvas with retro grid -->
+    <div id="canvas" class="retro-grid"></div>
+
+    <!-- Control Hub - -->
+    <aside class="fixed top-4 left-4 w-80 p-6 neo-glass rounded-xl z-20 transition-all duration-300">
+        <h1 class="text-2xl font-bold mb-4 digital-text text-[#4ec9e0]">EMBEDDINGS DISPLAY EXAMPLE</h1>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm mb-1 text-gray-300">DATA SEQUENCE</label>
+                <textarea id="embedding-input" class="w-full h-32 p-2 bg-[#04243a]/80 border border-[#4ec9e0]/30 rounded-lg text-sm font-mono focus:outline-none focus:border-[#4ec9e0] resize-y text-[#4ec9e0]" placeholder='{"type": "search", "embedding": [0.1, 0.2, ...]}'></textarea>
+            </div>
+            
+            <div class="flex gap-2">
+                <button id="visualize-btn" class="flex-1 py-2 bg-[#4ec9e0]/30 hover:bg-[#4ec9e0]/50 rounded-lg transition-colors btn-neon font-medium">VISUALIZE</button>
+                <button id="reset-btn" class="flex-1 py-2 bg-[#78e6c0]/30 hover:bg-[#78e6c0]/50 rounded-lg transition-colors btn-neon font-medium">RESET</button>
+            </div>
+            
+            <div class="neo-glass p-3 rounded-lg mt-4">
+                <button id="settings-toggle" class="w-full py-2 bg-[#04243a]/60 hover:bg-[#04243a]/80 rounded-lg text-sm flex items-center justify-between btn-neon">
+                    <span>MATRIX SETTINGS</span>
+                    <span id="settings-icon">▼</span>
+                </button>
+                <div id="settings-panel" class="mt-2 hidden space-y-3 p-2">
+                    <div>
+                        <label class="block text-xs mb-1 text-gray-300">FALL SPEED</label>
+                        <input type="range" id="speed-slider" min="1" max="10" value="5" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-xs mb-1 text-gray-300">GLOW INTENSITY</label>
+                        <input type="range" id="glow-slider" min="1" max="10" value="7" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-xs mb-1 text-gray-300">THRESHOLD</label>
+                        <input type="range" id="threshold-slider" min="1" max="10" value="5" class="w-full">
+                        <div id="threshold-value" class="text-xs text-right text-gray-400 mt-1">0.05</div>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="pulse-checkbox" class="mr-2">
+                        <label class="text-xs text-gray-300">PULSE EFFECT</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="neo-glass p-3 rounded-lg">
+                <button id="sample-toggle" class="w-full py-2 bg-[#04243a]/60 hover:bg-[#04243a]/80 rounded-lg text-sm flex items-center justify-between btn-neon">
+                    <span>SAMPLE DATA</span>
+                    <span id="toggle-icon">▼</span>
+                </button>
+                <div id="sample-panel" class="mt-2 hidden">
+                    <div class="flex gap-2 mb-2">
+                        <button id="generate-sample" class="flex-1 py-2 bg-[#78e6c0]/30 hover:bg-[#78e6c0]/50 rounded-lg text-sm btn-neon">GENERATE</button>
+                        <button id="shoot-btn" class="flex-1 py-2 bg-[#e0726c]/30 hover:bg-[#e0726c]/50 rounded-lg text-sm btn-neon">SHOOT</button>
+                    </div>
+                    <div id="stats" class="mt-2 text-xs text-[#4ec9e0] p-2 border border-[#4ec9e0]/20 rounded-lg font-mono"></div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        let scene, camera, renderer, controls, embeddings = [];
+        let fallSpeed = 5;
+        let glowIntensity = 7;
+        let gridScale = 1; // Fixed at 1:1 scale as requested
+        let valueThreshold = 0.05;
+        let pulseEffect = false; // Disabled by default as requested
+        let cameraInitialized = false;
+        let lastCameraPosition = { x: 0, y: 5, z: 10 };
+        let lastCameraTarget = { x: 0, y: 0, z: 0 };
+        
+        // Store the original embeddings for the "Shoot" functionality
+        let originalEmbeddings = [];
+        
+        // Shared particles for all planes
+        let sharedParticles = [];
+        
+        // Circuit vertical offset to prevent z-fighting
+        const CIRCUIT_Y_OFFSET = 0.015; // Increased offset to prevent intersection
+        
+        // Vertical spacing between planes
+        const PLANE_VERTICAL_SPACING = 5;
+        
+        // Box height/2 for collision detection
+        const BOX_HEIGHT_HALF = 0.1;
+        
+        // Collision buffer (detection slightly before actual collision)
+        const COLLISION_BUFFER = 0.05;
+        
+        // Colors
+        const BACKGROUND_COLOR = 0x04243a; // Deep blue background
+        const PLANE_COLOR = 0x021526;      // Darker blue for the plane
+        
+        // Pseudo-random number generator for deterministic results with different seeds
+        class PRNG {
+            constructor(seed) {
+                this.seed = seed;
+            }
+            
+            // Simple xorshift algorithm
+            random() {
+                this.seed ^= this.seed << 13;
+                this.seed ^= this.seed >>> 17;
+                this.seed ^= this.seed << 5;
+                return (this.seed >>> 0) / 4294967296;
+            }
+        }
+        
+        // New color palette based on the image
+        const COLORS = { 
+            search: 0x4ec9e0,  // Light blue
+            analysis: 0x78e6c0, // Teal/mint
+            data: 0xe0726c,     // Coral/red
+            default: 0xefd67c   // Yellow
+        };
+        
+        // Additional node colors from the image
+        const NODE_COLORS = [
+            0x4ec9e0, // Light blue
+            0x78e6c0, // Teal/mint
+            0xe0726c, // Coral/red
+            0xefd67c, // Yellow
+            0x6fc3ce  // Another blue tone
+        ];
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(BACKGROUND_COLOR);
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 15, 30);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            // Disable shadows for better performance
+            renderer.shadowMap.enabled = false;
+            document.getElementById('canvas').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 100;
+            
+            // Save camera position when user interacts with controls
+            controls.addEventListener('change', () => {
+                if (cameraInitialized) {
+                    lastCameraPosition.x = camera.position.x;
+                    lastCameraPosition.y = camera.position.y;
+                    lastCameraPosition.z = camera.position.z;
+                    lastCameraTarget.x = controls.target.x;
+                    lastCameraTarget.y = controls.target.y;
+                    lastCameraTarget.z = controls.target.z;
+                }
+            });
+
+            // Simplified lighting - just a basic ambient light
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            
+            // Main grid helper with updated color
+            const gridHelper = new THREE.GridHelper(100, 50, 0x4ec9e0, 0x032336);
+            gridHelper.position.y = -0.5;
+            scene.add(gridHelper);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // Event listeners for sliders
+            document.getElementById('speed-slider').addEventListener('input', (e) => {
+                fallSpeed = parseInt(e.target.value);
+            });
+            
+            document.getElementById('glow-slider').addEventListener('input', (e) => {
+                glowIntensity = parseInt(e.target.value);
+                updateGlowIntensity();
+            });
+            
+            document.getElementById('threshold-slider').addEventListener('input', (e) => {
+                valueThreshold = parseInt(e.target.value) / 100;
+                document.getElementById('threshold-value').textContent = valueThreshold.toFixed(2);
+            });
+            
+            document.getElementById('pulse-checkbox').addEventListener('change', (e) => {
+                pulseEffect = e.target.checked;
+            });
+            
+            // Set initial threshold value display
+            document.getElementById('threshold-value').textContent = valueThreshold.toFixed(2);
+            
+            // Set default checkbox state
+            document.getElementById('pulse-checkbox').checked = pulseEffect;
+
+            animate();
+        }
+        
+        function updateGlowIntensity() {
+            embeddings.forEach(e => {
+                if (e.illuminations) {
+                    e.illuminations.forEach(illum => {
+                        if (illum.material) {
+                            illum.material.opacity = (illum.userData.baseOpacity || 0.5) * (glowIntensity / 7);
+                        }
+                    });
+                }
+                
+                // Also update circuit nodes if they're illuminated
+                if (e.circuitNodes) {
+                    Object.values(e.circuitNodes).forEach(node => {
+                        if (node.isIlluminated && node.material) {
+                            node.material.opacity = Math.min(0.9, 0.3 + node.userData.value * 0.6) * (glowIntensity / 7);
+                        }
+                    });
+                }
+            });
+        }
+
+        // Check for collision between a particle and a plane
+        function checkCollision(particle, plane) {
+            // Get the world position of the plane (accounting for plane's group position)
+            const planeY = plane.group.position.y;
+            
+            // Get particle's position
+            const particleY = particle.position.y;
+            
+            // Get particle height/2 (half of box height)
+            const particleHeightHalf = particle.userData.length / 2;
+            
+            // Calculate collision point
+            const collisionPoint = planeY;
+            
+            // Detect if particle is about to collide with plane (with small buffer for pre-detection)
+            const isColliding = particleY - particleHeightHalf <= collisionPoint + COLLISION_BUFFER 
+                            && particleY - particleHeightHalf > collisionPoint - COLLISION_BUFFER
+                            && !particle.userData.collided[plane.gridIndex];
+            
+            // If collision detected and this plane hasn't been collided with yet
+            if (isColliding) {
+                return true;
+            }
+            
+            return false;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            const time = performance.now() * 0.001;
+            
+            // Update shared particles and check for collisions with planes
+            if (sharedParticles.length > 0) {
+                const speed = 0.01 * fallSpeed;
+                
+                // Update each digital element in the matrix
+                sharedParticles.forEach((p, i) => {
+                    // Store previous position for collision detection
+                    const prevY = p.position.y;
+                    
+                    // Falling motion
+                    p.position.y -= speed * (1 + Math.sin(i * 0.1) * 0.2);
+                    
+                    // Apply pulse effect if enabled (only for visible particles)
+                    if (pulseEffect && p.material) {
+                        p.material.opacity = 0.5 + Math.sin(time * 2 + i * 0.1) * 0.5;
+                    }
+                    
+                    // Check for collisions with all planes
+                    embeddings.forEach((plane, planeIndex) => {
+                        // Check collision with this specific plane
+                        if (checkCollision(p, plane)) {
+                            // Mark this plane as collided with this particle
+                            p.userData.collided[plane.gridIndex] = true;
+                            
+                            // Calculate exact grid position
+                            const posX = p.userData.gridX;
+                            const posZ = p.userData.gridZ;
+                            const key = `${posX}_${posZ}`;
+                            
+                            // Create illumination at this position
+                            const scaleFactor = 0.1; // Fixed scale factor for 1:1 ratio
+                            
+                            // Calculate the grid position with a 0.5 offset to center in cell
+                            const positionX = (posX - 14 + 0.5) * scaleFactor;
+                            const positionZ = (posZ - 14 + 0.5) * scaleFactor;
+                            
+                            // Create illumination and update network on this plane
+                            createIllumination(plane, key, positionX, positionZ, posX, posZ, p.userData.value, p.userData.color, time);
+                            
+                            // Increment completion counter
+                            p.userData.completedPlanes++;
+                        }
+                    });
+                    
+                    // Reset position when it falls far below all planes
+                    if (p.userData.completedPlanes >= embeddings.length || p.position.y < -15) {
+                        p.position.y = 25 + Math.random() * 5; // Start higher for vertical planes
+                        p.visible = true;
+                        p.userData.completedPlanes = 0;
+                        // Reset collision status for all planes
+                        p.userData.collided = embeddings.map(() => false);
+                    }
+                });
+            }
+            
+            // Update each embedding plane's effects
+            embeddings.forEach(e => {
+                // Fade out illumination over time - FASTER FADE (1 SECOND)
+                Object.keys(e.illumination).forEach(key => {
+                    const illum = e.illumination[key];
+                    
+                    // Time since last activation
+                    const timeSince = time - illum.userData.lastActive;
+                    
+                    // Start fading immediately, complete fade in ~1 second
+                    if (timeSince > 0.1) { // Start fade sooner
+                        // Fade out much faster - approximately 1 second total fade time
+                        illum.material.opacity *= 0.90; // Much faster decay
+                        
+                        // Remove if too faded
+                        if (illum.material.opacity < 0.05) {
+                            e.group.remove(illum);
+                            delete e.illumination[key];
+                            e.illuminations = e.illuminations.filter(i => i !== illum);
+                        }
+                    }
+                });
+                
+                // Animate network transition if any new nodes are being created
+                if (e.networkTransition && e.networkTransition.length > 0) {
+                    const now = performance.now();
+                    const completedTransitions = [];
+                    
+                    // Process each active transition
+                    e.networkTransition.forEach((transition, index) => {
+                        const elapsedMs = now - transition.startTime;
+                        const duration = transition.duration;
+                        const progress = Math.min(1, elapsedMs / duration);
+                        
+                        // If this is a new node appearing
+                        if (transition.type === 'add') {
+                            if (transition.node) {
+                                // Scale and fade in the node
+                                transition.node.scale.set(progress, progress, progress);
+                                transition.node.material.opacity = progress * (0.2 + transition.value * 0.3);
+                                
+                                // For connected lines
+                                if (transition.lines) {
+                                    transition.lines.forEach(line => {
+                                        line.material.opacity = progress * 0.2;
+                                    });
+                                }
+                            }
+                            
+                            // If transition is complete
+                            if (progress >= 1) {
+                                completedTransitions.push(index);
+                            }
+                        }
+                        // If this is an existing node being updated or removed
+                        else if (transition.type === 'update' || transition.type === 'remove') {
+                            if (transition.node) {
+                                if (transition.type === 'update') {
+                                    // Lerp between old and new values
+                                    const newColor = new THREE.Color(transition.color);
+                                    transition.node.material.color.lerp(newColor, progress);
+                                    
+                                    // Update size for update
+                                    const newScale = 1 + transition.value * 0.5;
+                                    transition.node.scale.set(
+                                        transition.node.userData.originalScale * (1-progress) + newScale * progress,
+                                        transition.node.userData.originalScale * (1-progress) + newScale * progress,
+                                        transition.node.userData.originalScale * (1-progress) + newScale * progress
+                                    );
+                                } else {
+                                    // Fade out for removal
+                                    transition.node.material.opacity = (1 - progress) * 0.5;
+                                    transition.node.scale.set(1-progress, 1-progress, 1-progress);
+                                    
+                                    // Also fade out lines
+                                    if (transition.lines) {
+                                        transition.lines.forEach(line => {
+                                            line.material.opacity = (1 - progress) * 0.2;
+                                        });
+                                    }
+                                }
+                                
+                                // If transition is complete
+                                if (progress >= 1) {
+                                    if (transition.type === 'remove') {
+                                        // Actually remove from scene
+                                        if (transition.node && transition.node.parent) {
+                                            transition.node.parent.remove(transition.node);
+                                        }
+                                        if (transition.lines) {
+                                            transition.lines.forEach(line => {
+                                                if (line.parent) line.parent.remove(line);
+                                            });
+                                        }
+                                    }
+                                    completedTransitions.push(index);
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Remove completed transitions (in reverse order to avoid index issues)
+                    completedTransitions.sort((a, b) => b - a).forEach(index => {
+                        e.networkTransition.splice(index, 1);
+                    });
+                }
+                
+                // Subtle animation for base circuit lines
+                if (e.circuits) {
+                    e.circuits.forEach((circuit, i) => {
+                        if (circuit.material && !circuit.isIlluminated) {
+                            circuit.material.opacity = 0.2 + Math.sin(time * 0.5 + i * 0.1) * 0.1;
+                        }
+                    });
+                }
+            });
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Unified function to create illumination and update network simultaneously
+        function createIllumination(plane, key, positionX, positionZ, gridX, gridZ, value, color, time) {
+            const scaleFactor = 0.1;
+            
+            // Create or update illumination
+            if (!plane.illumination[key]) {
+                // Create illumination cell
+                const illumGeo = new THREE.PlaneGeometry(scaleFactor * 0.9, scaleFactor * 0.9);
+                const opacity = 0.5 + value * 0.5;
+                const illumMat = new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: opacity * (glowIntensity / 7),
+                    side: THREE.DoubleSide,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const illum = new THREE.Mesh(illumGeo, illumMat);
+                illum.rotation.x = -Math.PI / 2;
+                illum.position.set(positionX, 0.01, positionZ);
+                illum.userData = {
+                    lastActive: time,
+                    gridX: gridX,
+                    gridZ: gridZ,
+                    value: value,
+                    baseOpacity: opacity
+                };
+                
+                plane.group.add(illum);
+                plane.illumination[key] = illum;
+                plane.illuminations.push(illum);
+                
+                // Immediately update the network in sync with illumination creation
+                updateNetworkWithNewPoint(plane, gridX, gridZ, value, color);
+            } else {
+                // If illumination already exists, update its lastActive time
+                plane.illumination[key].userData.lastActive = time;
+                
+                // Also update the network node if it exists
+                if (plane.circuitNodes[key]) {
+                    // Create a fast transition to update node
+                    const transition = {
+                        type: 'update',
+                        node: plane.circuitNodes[key],
+                        startTime: performance.now(),
+                        // Use shorter duration for more immediate feedback
+                        duration: 300,
+                        value: value,
+                        color: color
+                    };
+                    
+                    if (!plane.networkTransition) {
+                        plane.networkTransition = [];
+                    }
+                    plane.networkTransition.push(transition);
+                }
+            }
+        }
+        
+        // Function to update the network with new embedding points
+        function updateNetworkWithNewPoint(embedding, x, z, value, color) {
+            const scaleFactor = 0.1;
+            // Calculate the grid position with a 0.5 offset to center in cell
+            const positionX = (x - 14 + 0.5) * scaleFactor;
+            const positionZ = (z - 14 + 0.5) * scaleFactor;
+            const key = `${x}_${z}`;
+            
+            // Initialize network transition array if not exists
+            if (!embedding.networkTransition) {
+                embedding.networkTransition = [];
+            }
+            
+            // Check if a node already exists at this position
+            const existingNode = embedding.circuitNodes[key];
+            
+            if (existingNode) {
+                // Update existing node to match new data
+                const transition = {
+                    type: 'update',
+                    node: existingNode,
+                    startTime: performance.now(),
+                    // Use shorter duration for more immediate feedback
+                    duration: 300,
+                    value: value,
+                    color: color
+                };
+                
+                embedding.networkTransition.push(transition);
+            } else {
+                // Create a new node
+                const nodeSize = 0.005 + value * 0.01;
+                const node = new THREE.Mesh(
+                    new THREE.CircleGeometry(nodeSize, 8),
+                    new THREE.MeshBasicMaterial({
+                        color: color,
+                        transparent: true,
+                        opacity: 0, // Start invisible
+                        side: THREE.DoubleSide
+                    })
+                );
+                
+                node.position.set(positionX, 0, positionZ);
+                node.rotation.x = -Math.PI / 2;
+                node.scale.set(0, 0, 0); // Start at zero scale
+                
+                node.userData = {
+                    baseValue: value,
+                    gridX: x,
+                    gridZ: z,
+                    nodeColor: color,
+                    originalScale: 1.0
+                };
+                
+                embedding.circuitGroup.add(node);
+                
+                // Add this to the circuit nodes
+                embedding.circuitNodes[key] = node;
+                node.connectedLines = [];
+                
+                // Connect to nearby existing nodes (max 3 connections)
+                const connectedLines = connectToNearbyNodes(embedding, node, x, z, value, color);
+                
+                // Create a transition to animate node appearance - faster for immediate feedback
+                const transition = {
+                    type: 'add',
+                    node: node,
+                    lines: connectedLines,
+                    startTime: performance.now(),
+                    // Use shorter duration for more immediate feedback
+                    duration: 400,
+                    value: value
+                };
+                
+                embedding.networkTransition.push(transition);
+                
+                // Also update the circuits array
+                embedding.circuits.push(node);
+                embedding.circuits.push(...connectedLines);
+            }
+            
+            // If we have too many nodes, schedule removal of oldest ones
+            const maxNodes = 150; // Maximum number of nodes to show
+            const nodeKeys = Object.keys(embedding.circuitNodes);
+            
+            if (nodeKeys.length > maxNodes) {
+                // Remove oldest nodes
+                const nodesToRemove = nodeKeys.slice(0, nodeKeys.length - maxNodes);
+                nodesToRemove.forEach(nodeKey => {
+                    const nodeToRemove = embedding.circuitNodes[nodeKey];
+                    
+                    if (nodeToRemove) {
+                        // Schedule removal animation
+                        const transition = {
+                            type: 'remove',
+                            node: nodeToRemove,
+                            lines: nodeToRemove.connectedLines,
+                            startTime: performance.now(),
+                            duration: 1000 // 1 second for removal
+                        };
+                        
+                        embedding.networkTransition.push(transition);
+                        
+                        // Delete from nodes map
+                        delete embedding.circuitNodes[nodeKey];
+                    }
+                });
+            }
+        }
+        
+        // Connect a new node to nearby existing nodes
+        function connectToNearbyNodes(embedding, node, x, z, value, color) {
+            const scaleFactor = 0.1;
+            // Calculate the grid position with a 0.5 offset to center in cell
+            const positionX = (x - 14 + 0.5) * scaleFactor;
+            const positionZ = (z - 14 + 0.5) * scaleFactor;
+            const connectedLines = [];
+            const maxConnections = 3;
+            
+            // Find nearby nodes to connect to
+            const nodeKeys = Object.keys(embedding.circuitNodes);
+            const candidates = [];
+            
+            nodeKeys.forEach(key => {
+                if (key === `${x}_${z}`) return; // Skip self
+                
+                const otherNode = embedding.circuitNodes[key];
+                const dx = otherNode.position.x - positionX;
+                const dz = otherNode.position.z - positionZ;
+                const distance = Math.sqrt(dx * dx + dz * dz);
+                
+                // Only connect to nearby nodes
+                if (distance < 0.7) {
+                    candidates.push({
+                        node: otherNode,
+                        distance: distance
+                    });
+                }
+            });
+            
+            // Sort by distance and connect to closest
+            candidates.sort((a, b) => a.distance - b.distance);
+            const connectionsToMake = Math.min(candidates.length, maxConnections);
+            
+            for (let i = 0; i < connectionsToMake; i++) {
+                const otherNode = candidates[i].node;
+                
+                // Create line connection
+                const line = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(positionX, 0, positionZ),
+                        new THREE.Vector3(otherNode.position.x, 0, otherNode.position.z)
+                    ]),
+                    new THREE.LineBasicMaterial({
+                        color: new THREE.Color(color).lerp(new THREE.Color(otherNode.userData.nodeColor), 0.5),
+                        transparent: true,
+                        opacity: 0 // Start invisible
+                    })
+                );
+                
+                embedding.circuitGroup.add(line);
+                connectedLines.push(line);
+                
+                // Update connected lines for both nodes
+                node.connectedLines.push(line);
+                otherNode.connectedLines.push(line);
+            }
+            
+            return connectedLines;
+        }
+        
+        // Create shared particles function
+        function createSharedParticles(embedding) {
+            // Reset existing shared particles
+            sharedParticles.forEach(p => {
+                if (p.parent) p.parent.remove(p);
+            });
+            sharedParticles = [];
+            
+            const particleGroup = new THREE.Group();
+            scene.add(particleGroup);
+            
+            // Calculate dimensions for 768 elements
+            // We'll use a 28x28 grid (784 total positions, close to 768)
+            const gridWidth = 28;
+            const gridHeight = 28;
+            
+            // Fixed scale factor for 1:1 scale
+            const scaleFactor = 0.1;
+            
+            // Create digital particles for each embedding value - these are the falling cubes
+            let particleCount = 0;
+            embedding.significantValues.forEach(point => {
+                // Staggered height for initial positions - start higher for multiple planes
+                const startHeight = 25 + Math.random() * 5;
+                
+                // Create geometry based on value
+                const length = point.value * 0.3 + 0.1;
+                const geo = new THREE.BoxGeometry(
+                    scaleFactor * 0.9, // width
+                    length,             // height
+                    scaleFactor * 0.9   // depth
+                );
+                
+                // Assign a color from the new palette - deterministic based on position
+                const nodeColor = NODE_COLORS[(point.col * 5 + point.row * 3) % NODE_COLORS.length];
+                
+                // Value-based color intensity
+                const colorIntensity = 0.7 + point.value * 0.3;
+                const elementColor = new THREE.Color(nodeColor).multiplyScalar(colorIntensity);
+                
+                // Material with glow - simplified to BasicMaterial
+                const mat = new THREE.MeshBasicMaterial({
+                    color: elementColor,
+                    transparent: true,
+                    opacity: 0.7 + point.value * 0.3
+                });
+                
+                const particle = new THREE.Mesh(geo, mat);
+                particle.position.set(point.x, startHeight, point.z);
+                
+                // Store original position and value in userData
+                particle.userData = {
+                    color: elementColor,
+                    value: point.value,
+                    gridX: point.col,
+                    gridZ: point.row,
+                    length: length,
+                    completedPlanes: 0, // Track how many planes this particle has completed
+                    collided: embeddings.map(() => false) // Track collisions with each plane
+                };
+                
+                particleGroup.add(particle);
+                sharedParticles.push(particle);
+                particleCount++;
+                
+                // Add subtle glow
+                const glowMat = new THREE.SpriteMaterial({
+                    map: createGlowTexture(elementColor),
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    opacity: 0.3
+                });
+                
+                const glow = new THREE.Sprite(glowMat);
+                glow.scale.set(scaleFactor, length * 2, 1);
+                particle.add(glow);
+            });
+            
+            return particleGroup;
+        }
+        
+        // Create digital matrix visualization with full 768 grid
+        function createMatrixViz(x, y, z, embedding, type, index) {
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+            
+            // We're not creating particles per plane anymore, just the shared ones
+            const illumination = {};
+            const illuminations = [];
+            const circuits = [];
+            const circuitNodes = {};
+            
+            // Calculate dimensions for 768 elements
+            // We'll use a 28x28 grid (784 total positions, close to 768)
+            const gridWidth = 28;
+            const gridHeight = 28;
+            
+            // Fixed scale factor for 1:1 scale
+            const scaleFactor = 0.1;
+            
+            // Get color based on type
+            const color = COLORS[type] || COLORS.default;
+            
+            // Progress tracking
+            const progressEl = document.getElementById('loading-progress');
+            
+            // Create base platform - no reflections needed, now with darker color
+            const baseSize = gridWidth * scaleFactor;
+            const baseGeo = new THREE.PlaneGeometry(baseSize, baseSize);
+            const baseMat = new THREE.MeshBasicMaterial({
+                color: PLANE_COLOR, // Darker than background
+                transparent: true,
+                opacity: 0.9, // Increased opacity to make it more visible
+                side: THREE.DoubleSide
+            });
+            
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            base.rotation.x = -Math.PI / 2;
+            base.position.y = 0;
+            
+            // Fix base position to align perfectly with grid - both need to be perfectly centered
+            // The base plane needs to be centered at (0,0,0) relative to the group
+            base.position.x = 0;
+            base.position.z = 0;
+            
+            group.add(base);
+            
+            // Add grid lines to base - perfectly centered with the base
+            const gridHelper = new THREE.GridHelper(baseSize, gridWidth, 0x4ec9e0, 0x021120);
+            gridHelper.position.y = 0.01;
+            // Update: Position the grid helper exactly in the center - same as the base position
+            gridHelper.position.x = 0;
+            gridHelper.position.z = 0;
+            gridHelper.material.opacity = 0.3;
+            gridHelper.material.transparent = true;
+            group.add(gridHelper);
+            
+            // Create a separate group for circuit patterns that will stay flat
+            const circuitGroup = new THREE.Group();
+            circuitGroup.position.y = CIRCUIT_Y_OFFSET; // Raised above the base to prevent z-fighting
+            group.add(circuitGroup);
+            
+            // Create a separate embedding for the circuit/network (initial network)
+            // We'll use a different pattern for the initial network, which will be gradually
+            // replaced by the new embedding as cubes clip through
+            const initialNetworkEmbedding = createInitialNetworkEmbedding(index);
+            
+            // Store significant values for the initial network
+            const networkSignificantValues = [];
+            initialNetworkEmbedding.forEach((val, i) => {
+                if (val > valueThreshold) {
+                    const col = i % gridWidth;
+                    const row = Math.floor(i / gridWidth);
+                    networkSignificantValues.push({
+                        index: i,
+                        value: val,
+                        col: col,
+                        row: row,
+                        // Centered positions in grid cells - precisely offset from center
+                        x: (col - gridWidth/2 + 0.5) * scaleFactor,
+                        z: (row - gridHeight/2 + 0.5) * scaleFactor
+                    });
+                }
+            });
+            
+            // First create circuit connections with initial network embedding
+            const circuitData = addInitialNetworkPatterns(
+                circuitGroup, 
+                color, 
+                baseSize, 
+                networkSignificantValues, 
+                scaleFactor,
+                circuitNodes,
+                type
+            );
+            
+            circuits.push(...circuitData.circuits);
+            
+            // Store significant values to use for falling cubes
+            const significantValues = [];
+            embedding.forEach((val, i) => {
+                if (val > valueThreshold) {
+                    const col = i % gridWidth;
+                    const row = Math.floor(i / gridWidth);
+                    significantValues.push({
+                        index: i,
+                        value: val,
+                        col: col,
+                        row: row,
+                        // Centered positions in grid cells - precisely offset from center
+                        x: (col - gridWidth/2 + 0.5) * scaleFactor,
+                        z: (row - gridHeight/2 + 0.5) * scaleFactor
+                    });
+                }
+            });
+            
+            // Add network transition array for animations
+            const networkTransition = [];
+            
+            scene.add(group);
+            return { 
+                group, 
+                type, 
+                illumination, 
+                illuminations,
+                circuits,
+                circuitGroup,
+                circuitNodes,
+                networkTransition,
+                gridIndex: index,
+                embedding: embedding.slice(), // Store a copy of the embedding
+                significantValues: significantValues.slice() // Store a copy of the significant values
+            };
+        }
+        
+        // Create the initial network embedding (different from the falling cubes)
+        function createInitialNetworkEmbedding(seed) {
+            const rng = new PRNG(seed + 12345);
+            const embedding = new Array(28 * 28).fill(0);
+            
+            // Create different patterns based on seed
+            for (let y = 0; y < 28; y++) {
+                for (let x = 0; x < 28; x++) {
+                    const i = y * 28 + x;
+                    
+                    // Different patterns for different seeds
+                    let val = 0;
+                    
+                    // Pattern 1: Grid pattern
+                    if (seed % 3 === 0) {
+                        if ((x % 4 === 0) || (y % 4 === 0)) {
+                            val = 0.3 + rng.random() * 0.4;
+                        }
+                    } 
+                    // Pattern 2: Central cluster
+                    else if (seed % 3 === 1) {
+                        const dx = x - 14;
+                        const dy = y - 14;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist < 10) {
+                            val = (1 - dist/10) * (0.3 + rng.random() * 0.5);
+                        }
+                    }
+                    // Pattern 3: Diagonal stripes
+                    else {
+                        if (Math.abs((x + y) % 8) < 2) {
+                            val = 0.3 + rng.random() * 0.4;
+                        }
+                    }
+                    
+                    // Add some random values throughout
+                    if (rng.random() < 0.05) {
+                        val = 0.3 + rng.random() * 0.5;
+                    }
+                    
+                    embedding[i] = val;
+                }
+            }
+            
+            return embedding;
+        }
+        
+        // Add initial network patterns - these will be gradually replaced
+        function addInitialNetworkPatterns(circuitGroup, color, baseSize, significantValues, scaleFactor, circuitNodes, type) {
+            const circuits = [];
+            
+            // First, add nodes at each significant position
+            significantValues.forEach(point => {
+                const key = `${point.col}_${point.row}`;
+                
+                // Assign a color from the new palette - deterministic based on position
+                const nodeColor = NODE_COLORS[(point.col * 3 + point.row * 7) % NODE_COLORS.length];
+                
+                const nodeSize = 0.005 + point.value * 0.01; // Size based on value
+                const node = new THREE.Mesh(
+                    new THREE.CircleGeometry(nodeSize, 8),
+                    new THREE.MeshBasicMaterial({
+                        color: nodeColor,
+                        transparent: true,
+                        opacity: 0.2 + point.value * 0.3,
+                        side: THREE.DoubleSide
+                    })
+                );
+                
+                node.position.set(point.x, 0, point.z);
+                node.rotation.x = -Math.PI / 2;
+                node.userData = {
+                    baseValue: point.value,
+                    gridX: point.col,
+                    gridZ: point.row,
+                    nodeColor: nodeColor,
+                    originalNodeColor: nodeColor,
+                    originalScale: 1.0,
+                    initial: true // Mark as initial network node
+                };
+                
+                circuitGroup.add(node);
+                circuits.push(node);
+                
+                // Store node in circuitNodes map for later access
+                circuitNodes[key] = node;
+                
+                // Initialize connectedLines array
+                node.connectedLines = [];
+            });
+            
+            // Connect nearby nodes with lines
+            const maxConnections = 3; // Max connections per node
+            const maxDistance = 0.7; // Max distance to connect nodes
+            
+            significantValues.forEach((pointA, idxA) => {
+                const connections = [];
+                const keyA = `${pointA.col}_${pointA.row}`;
+                
+                // Find nearest neighbors
+                significantValues.forEach((pointB, idxB) => {
+                    if (idxA === idxB) return; // Skip self
+                    
+                    const distance = Math.sqrt(
+                        Math.pow(pointA.x - pointB.x, 2) + 
+                        Math.pow(pointA.z - pointB.z, 2)
+                    );
+                    
+                    if (distance < maxDistance) {
+                        connections.push({
+                            point: pointB,
+                            distance: distance
+                        });
+                    }
+                });
+                
+                // Sort by distance and take closest
+                connections.sort((a, b) => a.distance - b.distance);
+                const connectionsToMake = Math.min(connections.length, maxConnections);
+                
+                // Create lines to nearest neighbors
+                for (let i = 0; i < connectionsToMake; i++) {
+                    const pointB = connections[i].point;
+                    const keyB = `${pointB.col}_${pointB.row}`;
+                    
+                    // Create a unique key for this connection to avoid duplicates
+                    const idxMin = Math.min(idxA, connections[i].point.index);
+                    const idxMax = Math.max(idxA, connections[i].point.index);
+                    const connectionKey = `${idxMin}_${idxMax}`;
+                    
+                    // Skip if this connection was already made
+                    if (circuits[connectionKey]) continue;
+                    
+                    // Get node colors for the connection
+                    const nodeColorA = circuitNodes[keyA].userData.nodeColor;
+                    const nodeColorB = circuitNodes[keyB].userData.nodeColor;
+                    
+                    // Create a gradient color for the line - mix 50/50
+                    const lineColor = new THREE.Color(nodeColorA).lerp(new THREE.Color(nodeColorB), 0.5);
+                    
+                    // Create line geometry
+                    const line = new THREE.Line(
+                        new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(pointA.x, 0, pointA.z),
+                            new THREE.Vector3(pointB.x, 0, pointB.z)
+                        ]),
+                        new THREE.LineBasicMaterial({
+                            color: lineColor,
+                            transparent: true,
+                            opacity: 0.2 + 0.2 * Math.min(pointA.value, pointB.value)
+                        })
+                    );
+                    
+                    // Mark this line as part of the initial network
+                    line.userData = { initial: true };
+                    
+                    circuitGroup.add(line);
+                    circuits.push(line);
+                    
+                    // Add this line to the connected lines for both nodes
+                    if (circuitNodes[keyA]) {
+                        circuitNodes[keyA].connectedLines.push(line);
+                    }
+                    if (circuitNodes[keyB]) {
+                        circuitNodes[keyB].connectedLines.push(line);
+                    }
+                    
+                    // Mark this connection as made
+                    circuits[connectionKey] = true;
+                }
+            });
+            
+            return { circuits, circuitNodes };
+        }
+        
+        // Helper to create glow texture
+        function createGlowTexture(color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            // Create radial gradient
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            
+            // Convert color to hex string
+            const colorHex = '#' + new THREE.Color(color).getHexString();
+            
+            gradient.addColorStop(0, colorHex);
+            gradient.addColorStop(0.5, colorHex.replace(')', ', 0.5)').replace('rgb', 'rgba'));
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
+        }
+
+        function visualize() {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'flex';
+            loading.style.opacity = '1';
+            document.getElementById('loading-progress').textContent = 'Parsing data...';
+            
+            // Store current camera position before visualization
+            if (cameraInitialized) {
+                lastCameraPosition.x = camera.position.x;
+                lastCameraPosition.y = camera.position.y;
+                lastCameraPosition.z = camera.position.z;
+                lastCameraTarget.x = controls.target.x;
+                lastCameraTarget.y = controls.target.y;
+                lastCameraTarget.z = controls.target.z;
+            }
+
+            setTimeout(() => {
+                const input = document.getElementById('embedding-input').value;
+                const data = input.split('\n').map(line => {
+                    try { return JSON.parse(line.trim()); } 
+                    catch (e) { console.error("JSON parse error:", e); return null; }
+                }).filter(d => d && d.embedding);
+
+                document.getElementById('loading-progress').textContent = 'Clearing previous visualization...';
+                
+                // Clear previous shared particles
+                sharedParticles.forEach(p => {
+                    if (p.parent) p.parent.remove(p);
+                });
+                sharedParticles = [];
+                
+                // Clear previous embeddings
+                embeddings.forEach(e => scene.remove(e.group));
+                embeddings = [];
+                originalEmbeddings = [];
+
+                // Stack planes vertically instead of horizontally
+                const positions = data.length === 1 ? [[0, 0, 0]] : 
+                                  data.length === 2 ? [[0, 0, 0], [0, PLANE_VERTICAL_SPACING, 0]] : 
+                                  [[0, 0, 0], [0, PLANE_VERTICAL_SPACING, 0], [0, PLANE_VERTICAL_SPACING * 2, 0]];
+                
+                data.slice(0, 3).forEach((d, i) => {
+                    document.getElementById('loading-progress').textContent = `Creating visualization ${i+1} of ${Math.min(3, data.length)}...`;
+                    const embedding = createMatrixViz(...positions[i], d.embedding, d.type || 'default', i);
+                    embeddings.push(embedding);
+                    
+                    // Store original embedding data
+                    originalEmbeddings.push({
+                        embedding: d.embedding.slice(),
+                        type: d.type || 'default'
+                    });
+                });
+
+                // Create shared particles only from the first embedding
+                if (embeddings.length > 0) {
+                    document.getElementById('loading-progress').textContent = 'Creating shared particles...';
+                    createSharedParticles(embeddings[0]);
+                }
+
+                updateStats(data);
+                
+                // Adjust camera position for vertical stack
+                if (cameraInitialized) {
+                    camera.position.set(lastCameraPosition.x, lastCameraPosition.y, lastCameraPosition.z);
+                    controls.target.set(lastCameraTarget.x, lastCameraTarget.y, lastCameraTarget.z);
+                } else {
+                    // Set default view based on number of planes
+                    const centerY = embeddings.length > 1 ? 
+                                  (PLANE_VERTICAL_SPACING * (embeddings.length - 1)) / 2 : 0;
+                    camera.position.set(0, centerY + 15, 20);
+                    controls.target.set(0, centerY, 0);
+                    
+                    // Save this as the last camera position
+                    lastCameraPosition.x = 0;
+                    lastCameraPosition.y = centerY + 15;
+                    lastCameraPosition.z = 20;
+                    lastCameraTarget.x = 0;
+                    lastCameraTarget.y = centerY;
+                    lastCameraTarget.z = 0;
+                    
+                    cameraInitialized = true;
+                }
+                
+                controls.update();
+
+                loading.style.opacity = '0';
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                }, 500);
+            }, 300);
+        }
+
+        // Function to "shoot" new particles with the same embedding data
+        function shootNewParticles() {
+            if (embeddings.length === 0) return;
+            
+            const loading = document.getElementById('loading');
+            loading.style.display = 'flex';
+            loading.style.opacity = '1';
+            document.getElementById('loading-progress').textContent = 'Preparing new particles...';
+            
+            setTimeout(() => {
+                // Create shared particles only from the first embedding
+                if (embeddings.length > 0) {
+                    document.getElementById('loading-progress').textContent = 'Creating shared particles...';
+                    createSharedParticles(embeddings[0]);
+                }
+                
+                loading.style.opacity = '0';
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                }, 500);
+            }, 300);
+        }
+
+        // Set the initial view for vertical stacking
+        function setInitialView() {
+            // Set default view based on number of planes
+            const centerY = embeddings.length > 1 ? 
+                         (PLANE_VERTICAL_SPACING * (embeddings.length - 1)) / 2 : 0;
+            camera.position.set(0, centerY + 15, 20);
+            controls.target.set(0, centerY, 0);
+            controls.update();
+            
+            // Save this as the last camera position
+            lastCameraPosition.x = 0;
+            lastCameraPosition.y = centerY + 15;
+            lastCameraPosition.z = 20;
+            lastCameraTarget.x = 0;
+            lastCameraTarget.y = centerY;
+            lastCameraTarget.z = 0;
+        }
+
+        // Reset button adjusted for vertical stacking
+        function resetView() {
+            // Set default view based on number of planes
+            const centerY = embeddings.length > 1 ? 
+                         (PLANE_VERTICAL_SPACING * (embeddings.length - 1)) / 2 : 0;
+            camera.position.set(0, centerY + 15, 20);
+            controls.target.set(0, centerY, 0);
+            controls.update();
+            
+            // Update last known position
+            lastCameraPosition.x = 0;
+            lastCameraPosition.y = centerY + 15;
+            lastCameraPosition.z = 20;
+            lastCameraTarget.x = 0;
+            lastCameraTarget.y = centerY;
+            lastCameraTarget.z = 0;
+        }
+
+        function generateSample() {
+            const types = ['search', 'analysis', 'data'];
+            const data = [];
+            
+            for (let i = 0; i < 3; i++) {
+                // Generate embedding with different patterns 
+                const embedding = Array(768).fill().map((_, idx) => {
+                    // Create patterns based on position in 28x28 grid
+                    const x = idx % 28;
+                    const y = Math.floor(idx / 28);
+                    
+                    // Different patterns for different types
+                    let val = 0;
+                    if (i === 0) { // Search - digital wave pattern
+                        // Circular ripple pattern
+                        const centerX = 14, centerY = 14;
+                        const dist = Math.sqrt((x-centerX)*(x-centerX) + (y-centerY)*(y-centerY));
+                        val = Math.sin(dist * 0.5) * 0.5 + 0.5;
+                        
+                        // Add digital steps
+                        val = Math.round(val * 5) / 5;
+                    } else if (i === 1) { // Analysis - digital grid pattern
+                        // Crosshatch pattern
+                        val = ((x % 4 < 2) && (y % 4 < 2)) ? 0.8 : 0.2;
+                        
+                        // Increase values along diagonals
+                        if ((x === y) || (x + y === 27)) {
+                            val = 0.9;
+                        }
+                    } else { // Data - clusters
+                        // Create multiple focal points
+                        const points = [
+                            {x: 7, y: 7}, 
+                            {x: 21, y: 7}, 
+                            {x: 14, y: 21},
+                            {x: 7, y: 21},
+                            {x: 21, y: 21}
+                        ];
+                        
+                        // Find closest point
+                        let minDist = Infinity;
+                        for (const p of points) {
+                            const d = Math.sqrt((x-p.x)*(x-p.x) + (y-p.y)*(y-p.y));
+                            minDist = Math.min(minDist, d);
+                        }
+                        
+                        val = 1 - Math.min(minDist / 10, 1);
+                        
+                        // Quantize for digital look
+                        val = Math.round(val * 4) / 4;
+                    }
+                    
+                    // Add some randomness
+                    val = Math.min(1, Math.max(0, val + (Math.random() - 0.5) * 0.1));
+                    
+                    // Binary threshold to create more distinct patterns
+                    return Math.random() < val ? val : 0;
+                });
+                
+                data.push({
+                    type: types[i],
+                    embedding: embedding
+                });
+            }
+            
+            document.getElementById('embedding-input').value = data.map(d => JSON.stringify(d)).join('\n');
+            visualize();
+        }
+
+        function updateStats(data) {
+            const stats = document.getElementById('stats');
+            stats.innerHTML = data.map(d => {
+                const e = d.embedding;
+                const avg = e.reduce((s, v) => s + v, 0) / e.length;
+                const min = Math.min(...e);
+                const max = Math.max(...e);
+                const significant = e.filter(v => v > valueThreshold).length;
+                
+                return `<div class="mb-2">
+                    <div class="font-medium digital-text">${d.type.toUpperCase()}</div>
+                    <div>MIN: ${min.toFixed(2)} | MAX: ${max.toFixed(2)}</div>
+                    <div>AVG: ${avg.toFixed(2)} | SIG: ${significant}</div>
+                    <div class="mt-1">SIGNAL INTENSITY: ${Math.round(significant/768*100)}%</div>
+                </div>`;
+            }).join('');
+        }
+
+        window.addEventListener('load', () => {
+            init();
+            
+            document.getElementById('visualize-btn').addEventListener('click', visualize);
+            document.getElementById('reset-btn').addEventListener('click', resetView);
+            document.getElementById('generate-sample').addEventListener('click', generateSample);
+            document.getElementById('shoot-btn').addEventListener('click', shootNewParticles);
+            
+            document.getElementById('sample-toggle').addEventListener('click', () => {
+                const panel = document.getElementById('sample-panel');
+                const icon = document.getElementById('toggle-icon');
+                panel.classList.toggle('hidden');
+                icon.textContent = panel.classList.contains('hidden') ? '▼' : '▲';
+            });
+            
+            document.getElementById('settings-toggle').addEventListener('click', () => {
+                const panel = document.getElementById('settings-panel');
+                const icon = document.getElementById('settings-icon');
+                panel.classList.toggle('hidden');
+                icon.textContent = panel.classList.contains('hidden') ? '▼' : '▲';
+            });
+
+            setTimeout(() => {
+                generateSample();
+                document.getElementById('loading').style.opacity = '0';
+                setTimeout(() => document.getElementById('loading').style.display = 'none', 500);
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
