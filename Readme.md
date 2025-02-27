@@ -7,5 +7,6 @@
 - Dark, neon-themed UI with orbit controls.
 - 
 (turn pulse on for variation between layers)
+NOT FOR PROD, check tailwind error.
 
 ![Matrix Embedding Visualization](https://github.com/Gman-Superfly/viz/blob/main/pic_viz_001.png)
